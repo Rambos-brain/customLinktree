@@ -1,0 +1,89 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* --- GLOBAL PAGE LAYOUT --- */
+body {
+  background: #000;
+  color: white;
+  font-family: 'Orbitron', sans-serif;
+  overflow-x: hidden;
+}
+
+/* container centered like GTA menu */
+.grid-main {
+  width: 1200px;
+  margin: 32px auto;
+  display: grid;
+  grid-template-columns: 760px 360px;
+  grid-template-rows: 420px 355px;
+  gap: 18px;
+}
+
+/* generic panels */
+.panel {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #111;
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.6);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.panel-hover:hover {
+  transform: scale(1.03);
+  box-shadow: 0 0 18px rgba(255, 255, 255, 0.35);
+}
+
+.panel-title {
+  font-size: 1rem;
+  font-weight: 700;
+  padding: 8px 12px;
+  text-shadow: 0 0 6px rgba(0, 0, 0, 0.7);
+}
+
+/* --- INDIVIDUAL PANEL SIZES --- */
+.twitch-panel {
+  width: 100%;
+  height: 100%;
+}
+
+.youtube-panel {
+  width: 560px;
+  height: 360px;
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  background: #000;
+}
+
+.youtube-panel iframe {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  min-width: 120%;
+  min-height: 120%;
+  transform: translate(-50%, -50%);
+  border: none;
+}
+
+.spotify-panel {
+  width: 450px;
+  height: 360px;
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.spotify-panel iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+/* stacked panels on right side */
+.right-column {
+  display: grid;
+  grid-template-rows: 1fr 1fr;
+  gap: 18px;
+}
