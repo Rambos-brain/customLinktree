@@ -50,7 +50,7 @@ body {
 .panel {
   border-radius: 12px;
   overflow: hidden;
-  background: #111;
+  background: #11111100;
   box-shadow: 0 8px 30px rgba(0,0,0,0.6);
   transition: transform 0.25s ease, box-shadow 0.25s ease;
 }

@@ -82,7 +82,7 @@ export default function YouTubePanel() {
         </a>
       )}
 
-      <div className="panel-title absolute left-2 top-2">CAREER PROGRESS</div>
+      <div className="panel-title absolute left-2 top-2">YOUTUBE VIDEO</div>
     </div>
   );
 }

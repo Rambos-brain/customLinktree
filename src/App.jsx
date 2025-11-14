@@ -1,19 +1,35 @@
-import React from "react"
-import Panel from "./components/Panel"
-import YouTubePanel from "./components/YouTubePanel"
-import FaultyTerminal from "./components/FaultyTerminal"   // <-- ADD THIS
-import { LINKS } from "./config"
-import fallback from "./assets/fallback.png"
+import React, { useRef, useEffect } from "react";
+
+import Panel from "./components/Panel";
+import YouTubePanel from "./components/YouTubePanel";
+import FaultyTerminal from "./components/FaultyTerminal";
+import VoidTransition from "./components/VoidTransition";
+import FuzzyText from "./components/FuzzyText"; // important
+import { LINKS } from "./config";
+import fallback from "./assets/fallback.png";
 import "./components/FaultyTerminal.css";
 
 export default function App() {
+  const voidRef = useRef(null);
+
+  useEffect(() => {
+    window.__VOID__ = {
+      trigger: (url, elem) => {
+        if (voidRef.current) {
+          voidRef.current.triggerTransition(url, elem);
+        }
+      }
+    };
+  }, []);
+
   const spotifyEmbed =
-    "https://open.spotify.com/embed/playlist/3sK22p6qc6blOI0qdCk19f?utm_source=generator&theme=0"
+    "https://open.spotify.com/embed/playlist/3sK22p6qc6blOI0qdCk19f?utm_source=generator&theme=0";
 
   return (
     <div className="faulty-terminal-bg min-h-screen w-full relative overflow-hidden">
 
-      {/* ⭐ BACKGROUND EFFECT (BEHIND EVERYTHING) ⭐ */}
+      <VoidTransition ref={voidRef} />
+
       <FaultyTerminal
         className="absolute inset-0 -z-10"
         scale={1.5}
@@ -35,10 +51,8 @@ export default function App() {
         brightness={1}
       />
 
-      {/* ⭐ MAIN CONTENT ABOVE BACKGROUND ⭐ */}
       <div className="grid-main relative z-10">
 
-        {/* TOP LEFT - TWITCH */}
         <div className="twitch-panel panel">
           <iframe
             src={`https://player.twitch.tv/?channel=${LINKS.twitchUser}&parent=${window.location.hostname}&autoplay=true&muted=true`}
@@ -48,10 +62,9 @@ export default function App() {
             frameBorder="0"
             allowFullScreen
           ></iframe>
-          <div className="panel-title absolute left-2 top-2">INDEPENDENCE DAY</div>
+          <div className="panel-title absolute left-2 top-2">TWITCH STREAM</div>
         </div>
 
-        {/* TOP RIGHT - TWITTER + GITHUB */}
         <div className="right-column">
           <Panel
             title="TWITTER"
@@ -67,7 +80,6 @@ export default function App() {
           />
         </div>
 
-        {/* BOTTOM LEFT - YOUTUBE + SPOTIFY */}
         <div className="flex gap-4 items-stretch">
           <YouTubePanel />
 
@@ -78,11 +90,10 @@ export default function App() {
               allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
               loading="lazy"
             ></iframe>
-            <div className="panel-title absolute left-2 top-2">FINDERS KEEPERS</div>
+            <div className="panel-title absolute left-2 top-2">RAMBOS SPOTIFY</div>
           </div>
         </div>
 
-        {/* BOTTOM RIGHT - DISCORD + PLAYSTATION */}
         <div className="right-column">
           <Panel
             title="DISCORD"
@@ -97,7 +108,8 @@ export default function App() {
             fallback={fallback}
           />
         </div>
+
       </div>
     </div>
-  )
+  );
 }

@@ -1,5 +1,5 @@
-import React, { useEffect, useRef, useMemo, useCallback } from 'react';
-import { Renderer, Program, Mesh, Color, Triangle } from 'ogl';
+import React, { useEffect, useRef, useMemo, useCallback } from "react";
+import { Renderer, Program, Mesh, Color, Triangle } from "ogl";
 import "./FaultyTerminal.css";
 
 /* Vertex shader */
@@ -13,7 +13,7 @@ void main() {
 }
 `;
 
-/* Fragment shader (mouse influence amplified, chromatic added, proximity tint) */
+/* Fragment shader: strength, frequency, spikes, wipes, mouse glow, proximity tint */
 const fragmentShader = `
 precision mediump float;
 
@@ -26,15 +26,21 @@ uniform float uScale;
 uniform vec2  uGridMul;
 uniform float uDigitSize;
 uniform float uScanlineIntensity;
-uniform float uGlitchAmount;
+uniform float uGlitchAmount;       // base glitch multiplier
+uniform float uGlitchTimeBoost;    // strength ramp over time (JS-driven)
+uniform float uGlitchFreqBoost;    // frequency ramp over time (JS-driven)
+uniform float uGlitchSpike;        // spike (0..1) applied when random spike occurs
+uniform float uGlitchSpikeIntensity; // spike intensity multiplier
 uniform float uFlickerAmount;
 uniform float uNoiseAmp;
 uniform float uChromaticAberration;
 uniform float uDither;
 uniform float uCurvature;
-uniform vec3  uTint;
-uniform vec3  uProximityTint;       // NEW: proximity tint color
-uniform float uProximityStrength;    // NEW: proximity tint strength (0..1)
+
+uniform vec3  uBaseTint;
+uniform vec3  uMouseTint;
+uniform float uMouseTintStrength;
+
 uniform vec2  uMouse;
 uniform float uMouseStrength;
 uniform float uUseMouse;
@@ -48,6 +54,10 @@ float hash21(vec2 p){
   p = fract(p * 234.56);
   p += dot(p, p + 34.56);
   return fract(p.x * p.y);
+}
+
+float random1(float x) {
+  return fract(sin(x)*43758.5453123);
 }
 
 float noise(vec2 p)
@@ -96,29 +106,23 @@ float pattern(vec2 p, out vec2 q, out vec2 r) {
 }
 
 float digit(vec2 p){
+    // grid controls background scale
     vec2 grid = uGridMul * 25.0;
-    //IMPORTANT - controls scale of background
     vec2 s = floor(p * grid) / grid;
     p = p * grid;
     vec2 q, r;
     float intensity = pattern(s * 0.1, q, r) * 1.3 - 0.03;
 
-    // --- MOUSE INFLUENCE (AMPLIFIED) ---
     if(uUseMouse > 0.5){
-        // convert mouse (0..1) into same grid space
         vec2 mouseWorld = clamp(uMouse * uScale, 0.0, uScale);
-        //IMPORTANT - controls the radius of the color distortion
         float distToMouse = distance(s, mouseWorld);
 
-        // reduced decay and stronger multiplier, clamped
+        // base mouse influence scaled by time-based factors in JS
         float rawInfluence = exp(-distToMouse * 20.0) * uMouseStrength * 22.0;
-        //IMPORTANT - distToMouse controls radius of distortion
         float mouseInfluence = clamp(rawInfluence, 0.0, 40.0);
 
         intensity += mouseInfluence;
-
-        // stronger ripple near cursor
-        float ripple = sin(distToMouse * 18.0 - iTime * 6.0) * 0.14 * mouseInfluence;
+        float ripple = sin(distToMouse * (18.0 + uGlitchFreqBoost*6.0) - iTime * (6.0 + uGlitchFreqBoost*2.0)) * 0.14 * mouseInfluence;
         intensity += ripple;
     }
 
@@ -126,7 +130,6 @@ float digit(vec2 p){
         float cellRandom = fract(sin(dot(s, vec2(12.9898, 78.233))) * 43758.5453);
         float cellDelay = cellRandom * 0.8;
         float cellProgress = clamp((uPageLoadProgress - cellDelay) / 0.2, 0.0, 1.0);
-
         float fadeAlpha = smoothstep(0.0, 1.0, cellProgress);
         intensity *= fadeAlpha;
     }
@@ -147,7 +150,7 @@ float digit(vec2 p){
     float isOn = step(0.1, intensity - f);
     float brightness = isOn * (0.2 + y * 0.8) * (0.75 + x * 0.25);
 
-    return step(0.0, p.x) * step(p.x, 1.0) * step(0.0, p.y) * step(p.y, 1.0) * brightness;
+    return brightness;
 }
 
 float onOff(float a, float b, float c)
@@ -155,11 +158,20 @@ float onOff(float a, float b, float c)
   return step(c, sin(iTime + a * cos(iTime * b))) * uFlickerAmount;
 }
 
+// displacement with frequency & spike influence; spike can generate wipe-like motion
 float displace(vec2 look)
 {
     float y = look.y - mod(iTime * 0.25, 1.0);
     float window = 1.0 / (1.0 + 50.0 * y * y);
-    return sin(look.y * 20.0 + iTime) * 0.0125 * onOff(4.0, 2.0, 0.8) * (1.0 + cos(iTime * 60.0)) * window;
+
+    // base ripple frequency affected by uGlitchFreqBoost
+    float rippleFreq = 20.0 + uGlitchFreqBoost * 40.0;
+
+    // spike-driven extra displacement (wipe)
+    float spike = uGlitchSpike * uGlitchSpikeIntensity;
+    float wipe = spike * smoothstep(0.0, 1.0, 1.0 - abs(mod(iTime * 0.5, 2.0) - 1.0)); // short wipe envelope
+
+    return sin(look.y * rippleFreq + iTime * (1.0 + uGlitchFreqBoost * 2.0)) * 0.0125 * onOff(4.0, 2.0, 0.8) * (1.0 + cos(iTime * 60.0)) * window * (1.0 + spike*2.0) + wipe * 0.05 * spike;
 }
 
 vec3 getColor(vec2 p){
@@ -167,20 +179,18 @@ vec3 getColor(vec2 p){
     float bar = step(mod(p.y + time * 20.0, 1.0), 0.2) * 0.4 + 1.0;
     bar *= uScanlineIntensity;
 
-    // base displacement + small global displacement
     float displacement = displace(p);
-    p.x += displacement;
 
-    if (uGlitchAmount != 1.0) {
-      float extra = displacement * (uGlitchAmount - 1.0);
-      p.x += extra;
-    }
+    // total glitch power: base * (1 + timeBoost) + spike
+    float glitchPower = uGlitchAmount * (1.0 + uGlitchTimeBoost) + uGlitchSpike * uGlitchSpikeIntensity;
+
+    p.x += displacement * glitchPower;
 
     float middle = digit(p);
 
     const float off = 0.002;
     float sum = digit(p + vec2(-off, -off)) + digit(p + vec2(0.0, -off)) + digit(p + vec2(off, -off)) +
-                digit(p + vec2(-off, 0.0)) + digit(p + vec2(0.0, 0.0)) + digit(p + vec2(off, 0.0)) +
+                digit(p + vec2(-off, 0.0)) + digit(p) + digit(p + vec2(off, 0.0)) +
                 digit(p + vec2(-off, off)) + digit(p + vec2(0.0, off)) + digit(p + vec2(off, off));
 
     vec3 baseColor = vec3(1.0) * middle + sum * 0.1 * vec3(1.0) * bar;
@@ -205,45 +215,39 @@ void main() {
     vec2 p = uv * uScale;
     vec3 col = getColor(p);
 
-    // small chromatic split when mouse is active (subtle)
     if(uChromaticAberration != 0.0 && uUseMouse > 0.5){
-      vec2 ca = vec2(uChromaticAberration) / iResolution.xy;
+      vec2 ca = vec2(uChromaticAberration * (1.0 + uGlitchTimeBoost * 0.1)) / iResolution.xy;
       float r = getColor(p + ca).r;
       float b = getColor(p - ca).b;
       col = vec3(r, col.g, b);
     }
 
-    // -----------------------------
-    // PROXIMITY-BASED COLOR TINT
-    // -----------------------------
-    // compute distance from fragment to mouse in normalized uv space (0..1)
+    // Proximity-based additive mouse glow
     float d = distance(uv, uMouse);
-    // convert distance into a proximity factor (1 = very close, 0 = far)
-    // the multiplier controls radius; tweak 1.8..2.4 for tighter/wider radius
     float proximity = pow(1.0 - clamp(d * 4.0, 0.0, 1.0), 2.0);
-    // blend toward proximity tint color
-    col = mix(col, uProximityTint, proximity * uProximityStrength);
 
-    col *= uTint;
-    col *= uBrightness;
+    vec3 base = col * uBaseTint * uBrightness;
+    vec3 mouseGlow = uMouseTint * (proximity * uMouseTintStrength);
+
+    // final color (clamp at end)
+    vec3 finalCol = base + mouseGlow;
 
     if(uDither > 0.0){
       float rnd = hash21(gl_FragCoord.xy);
-      col += (rnd - 0.5) * (uDither * 0.003922);
+      finalCol += (rnd - 0.5) * (uDither * 0.003922);
     }
 
-    gl_FragColor = vec4(col, 1.0);
+    finalCol = clamp(finalCol, 0.0, 1.0);
+
+    gl_FragColor = vec4(finalCol, 1.0);
 }
 `;
 
 /* helper: hex -> normalized rgb array */
 function hexToRgb(hex) {
-  let h = hex.replace('#', '').trim();
-  if (h.length === 3)
-    h = h
-      .split('')
-      .map(c => c + c)
-      .join('');
+  let h = hex.replace("#", "").trim();
+  if (h.length === 8) h = h.slice(0, 6); // drop alpha if provided
+  if (h.length === 3) h = h.split("").map((c) => c + c).join("");
   const num = parseInt(h, 16);
   return [((num >> 16) & 255) / 255, ((num >> 8) & 255) / 255, (num & 255) / 255];
 }
@@ -258,15 +262,27 @@ export default function FaultyTerminal({
   glitchAmount = 1,
   flickerAmount = 1,
   noiseAmp = 0,
-  chromaticAberration = 0.6,   // a little chromatic by default
+  chromaticAberration = 0.6,
   dither = 0,
   curvature = 0.2,
-  tint = '#ffffff',
+
+  // color & mouse glow
+  baseTint = "#ff0000ff", // default green-ish background
   mouseReact = true,
-  mouseStrength = 0.6,          // stronger by default
-  proximityTint = '#00ff00ff',    // NEW: default proximity tint (red)
-  proximityTintStrength = 1.0,  // NEW: how strong tint is at max proximity
-  //IMPORTANT controls the strength of the proximity tint
+  mouseStrength = 0.6,
+  mouseTint = "#4400ffff",
+  mouseTintStrength = 1.0,
+
+  // glitch-over-time controls (strength + frequency + spikes)
+  glitchOverTime = true,
+  glitchMaxBoost = 30,      // max strength multiplier added by time
+  glitchFreqMax = 10.0,      // max frequency boost multiplier (applied to some ripple math)
+  glitchRampSpeed = 0.01,   // ramp speed (higher = faster)
+  // spikes
+  spikeChance = 0.008,      // base chance per frame to spawn a spike (multiplied by time-norm)
+  spikeIntensityMax = 3.0,  // how violent a spike can be
+  spikeDecay = 0.6,         // how fast spike decays (1 = fast, lower = slower)
+
   dpr = Math.min(window.devicePixelRatio || 1, 2),
   pageLoadAnimation = true,
   brightness = 1,
@@ -277,19 +293,28 @@ export default function FaultyTerminal({
   const containerRef = useRef(null);
   const programRef = useRef(null);
   const rendererRef = useRef(null);
+
   const mouseRef = useRef({ x: 0.5, y: 0.5 });
   const smoothMouseRef = useRef({ x: 0.5, y: 0.5 });
+
   const frozenTimeRef = useRef(0);
   const rafRef = useRef(0);
+
   const loadAnimationStartRef = useRef(0);
   const timeOffsetRef = useRef(Math.random() * 100);
 
-  const tintVec = useMemo(() => hexToRgb(tint), [tint]);
-  const proximityTintVec = useMemo(() => hexToRgb(proximityTint), [proximityTint]);
+  const startTimeRef = useRef(null);
+  const activeSpikeRef = useRef({ value: 0, endTime: 0 });
 
-  const ditherValue = useMemo(() => (typeof dither === 'boolean' ? (dither ? 1 : 0) : dither), [dither]);
+  const baseTintVec = useMemo(() => hexToRgb(baseTint), [baseTint]);
+  const mouseTintVec = useMemo(() => hexToRgb(mouseTint), [mouseTint]);
 
-  const handleMouseMove = useCallback(e => {
+  const ditherValue = useMemo(
+    () => (typeof dither === "boolean" ? (dither ? 1 : 0) : dither),
+    [dither]
+  );
+
+  const handleMouseMove = useCallback((e) => {
     const ctn = containerRef.current;
     if (!ctn) return;
     const rect = ctn.getBoundingClientRect();
@@ -315,31 +340,38 @@ export default function FaultyTerminal({
       uniforms: {
         iTime: { value: 0 },
         iResolution: {
-          value: new Color(gl.canvas.width, gl.canvas.height, gl.canvas.width / gl.canvas.height)
+          value: new Color(gl.canvas.width, gl.canvas.height, gl.canvas.width / gl.canvas.height),
         },
+
         uScale: { value: scale },
 
         uGridMul: { value: new Float32Array(gridMul) },
         uDigitSize: { value: digitSize },
         uScanlineIntensity: { value: scanlineIntensity },
         uGlitchAmount: { value: glitchAmount },
+        uGlitchTimeBoost: { value: 0 },
+        uGlitchFreqBoost: { value: 0 },
+        uGlitchSpike: { value: 0 },
+        uGlitchSpikeIntensity: { value: 0 },
         uFlickerAmount: { value: flickerAmount },
         uNoiseAmp: { value: noiseAmp },
         uChromaticAberration: { value: chromaticAberration },
         uDither: { value: ditherValue },
         uCurvature: { value: curvature },
-        uTint: { value: new Color(tintVec[0], tintVec[1], tintVec[2]) },
-        uProximityTint: { value: new Color(proximityTintVec[0], proximityTintVec[1], proximityTintVec[2]) }, // NEW
-        uProximityStrength: { value: proximityTintStrength }, // NEW
-        uMouse: {
-          value: new Float32Array([smoothMouseRef.current.x, smoothMouseRef.current.y])
-        },
+
+        uBaseTint: { value: new Color(baseTintVec[0], baseTintVec[1], baseTintVec[2]) },
+        uMouseTint: { value: new Color(mouseTintVec[0], mouseTintVec[1], mouseTintVec[2]) },
+        uMouseTintStrength: { value: mouseTintStrength },
+
+        uMouse: { value: new Float32Array([smoothMouseRef.current.x, smoothMouseRef.current.y]) },
         uMouseStrength: { value: mouseStrength },
         uUseMouse: { value: mouseReact ? 1 : 0 },
+
         uPageLoadProgress: { value: pageLoadAnimation ? 0 : 1 },
         uUsePageLoadAnimation: { value: pageLoadAnimation ? 1 : 0 },
-        uBrightness: { value: brightness }
-      }
+
+        uBrightness: { value: brightness },
+      },
     });
     programRef.current = program;
 
@@ -348,18 +380,14 @@ export default function FaultyTerminal({
     function resize() {
       if (!ctn || !renderer) return;
       renderer.setSize(ctn.offsetWidth, ctn.offsetHeight);
-      program.uniforms.iResolution.value = new Color(
-        gl.canvas.width,
-        gl.canvas.height,
-        gl.canvas.width / gl.canvas.height
-      );
+      program.uniforms.iResolution.value = new Color(gl.canvas.width, gl.canvas.height, gl.canvas.width / gl.canvas.height);
     }
 
     const resizeObserver = new ResizeObserver(() => resize());
     resizeObserver.observe(ctn);
     resize();
 
-    const update = t => {
+    const update = (t) => {
       rafRef.current = requestAnimationFrame(update);
 
       if (pageLoadAnimation && loadAnimationStartRef.current === 0) {
@@ -382,41 +410,94 @@ export default function FaultyTerminal({
       }
 
       if (mouseReact) {
-        const dampingFactor = 0.08;
-        const smoothMouse = smoothMouseRef.current;
-        const mouse = mouseRef.current;
-        smoothMouse.x += (mouse.x - smoothMouse.x) * dampingFactor;
-        smoothMouse.y += (mouse.y - smoothMouse.y) * dampingFactor;
+        const damping = 0.08;
+        smoothMouseRef.current.x += (mouseRef.current.x - smoothMouseRef.current.x) * damping;
+        smoothMouseRef.current.y += (mouseRef.current.y - smoothMouseRef.current.y) * damping;
 
-        const mouseUniform = program.uniforms.uMouse.value;
-        mouseUniform[0] = smoothMouse.x;
-        mouseUniform[1] = smoothMouse.y;
+        const mu = program.uniforms.uMouse.value;
+        mu[0] = smoothMouseRef.current.x;
+        mu[1] = smoothMouseRef.current.y;
+      }
+
+      // glitch over time: both strength and frequency
+      if (glitchOverTime) {
+        if (startTimeRef.current === null) startTimeRef.current = t;
+        const seconds = (t - startTimeRef.current) * 0.001;
+
+        // normalized 0..1 with aggressive ease-out curve
+        let normalized = Math.pow(1.0 - Math.exp(-seconds * glitchRampSpeed), 2.5);
+        normalized = Math.min(Math.max(normalized, 0), 1);
+
+        // strength boost
+        const strengthBoost = normalized * glitchMaxBoost;
+        program.uniforms.uGlitchTimeBoost.value = strengthBoost;
+
+        // frequency boost (smaller scale)
+        const freqBoost = normalized * glitchFreqMax;
+        program.uniforms.uGlitchFreqBoost.value = freqBoost;
+
+        // gradually increase chance of spike as time goes (not deterministic)
+        const timeScaledChance = spikeChance * (1.0 + normalized * 8.0);
+
+        // attempt to spawn a spike (stochastic)
+        if (Math.random() < timeScaledChance) {
+          // assign a spike
+          const intensity = 0.5 + Math.random() * (spikeIntensityMax - 0.5); // min 0.5
+          activeSpikeRef.current.value = intensity;
+          activeSpikeRef.current.endTime = t + 1000 * (0.5 + intensity * spikeDecay);
+        }
+      }
+
+      // manage active spike decay
+      if (activeSpikeRef.current.value > 0) {
+        const now = t;
+        const remaining = Math.max(0, activeSpikeRef.current.endTime - now);
+        const total = Math.max(1, (activeSpikeRef.current.endTime - (startTimeRef.current || now)));
+        // spike factor 0..1
+        const spikeFactor = remaining / total;
+        program.uniforms.uGlitchSpike.value = spikeFactor;
+        program.uniforms.uGlitchSpikeIntensity.value = activeSpikeRef.current.value * spikeFactor;
+
+        if (remaining <= 0) {
+          activeSpikeRef.current.value = 0;
+          activeSpikeRef.current.endTime = 0;
+          program.uniforms.uGlitchSpike.value = 0;
+          program.uniforms.uGlitchSpikeIntensity.value = 0;
+        }
+      } else {
+        program.uniforms.uGlitchSpike.value = 0;
+        program.uniforms.uGlitchSpikeIntensity.value = 0;
       }
 
       renderer.render({ scene: mesh });
     };
+
     rafRef.current = requestAnimationFrame(update);
+
+    // append canvas and make sure it doesn't block interactions
     ctn.appendChild(gl.canvas);
+    gl.canvas.style.position = "absolute";
+    gl.canvas.style.inset = "0";
+    gl.canvas.style.width = "100%";
+    gl.canvas.style.height = "100%";
+    gl.canvas.style.pointerEvents = "none";
+    gl.canvas.style.zIndex = "0";
 
-    // IMPORTANT: make sure the canvas doesn't block UI
-    gl.canvas.style.position = 'absolute';
-    gl.canvas.style.inset = '0';
-    gl.canvas.style.width = '100%';
-    gl.canvas.style.height = '100%';
-    gl.canvas.style.pointerEvents = 'none';
-    gl.canvas.style.zIndex = '0';
-
-    if (mouseReact) window.addEventListener('mousemove', handleMouseMove);
+    // listen to window mouse so panels don't block it
+    if (mouseReact) window.addEventListener("mousemove", handleMouseMove);
 
     return () => {
       cancelAnimationFrame(rafRef.current);
       resizeObserver.disconnect();
-      if (mouseReact) window.removeEventListener('mousemove', handleMouseMove);
+      if (mouseReact) window.removeEventListener("mousemove", handleMouseMove);
       if (gl.canvas.parentElement === ctn) ctn.removeChild(gl.canvas);
-      gl.getExtension('WEBGL_lose_context')?.loseContext();
+      gl.getExtension("WEBGL_lose_context")?.loseContext();
       loadAnimationStartRef.current = 0;
       timeOffsetRef.current = Math.random() * 100;
+      startTimeRef.current = null;
+      activeSpikeRef.current = { value: 0, endTime: 0 };
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     dpr,
     pause,
@@ -431,15 +512,22 @@ export default function FaultyTerminal({
     chromaticAberration,
     ditherValue,
     curvature,
-    tintVec,
-    proximityTintVec,
+    baseTintVec,
+    mouseTintVec,
     mouseReact,
     mouseStrength,
-    proximityTintStrength,
+    mouseTintStrength,
+    glitchOverTime,
+    glitchMaxBoost,
+    glitchFreqMax,
+    glitchRampSpeed,
+    spikeChance,
+    spikeIntensityMax,
+    spikeDecay,
     pageLoadAnimation,
     brightness,
-    handleMouseMove
+    handleMouseMove,
   ]);
 
-  return <div ref={containerRef} className={`faulty-terminal-container ${className || ''}`} style={style} {...rest} />;
+  return <div ref={containerRef} className={`faulty-terminal-container ${className || ""}`} style={style} {...rest} />;
 }

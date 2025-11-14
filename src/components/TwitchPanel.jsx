@@ -12,7 +12,7 @@ export default function TwitchPanel() {
 
   useEffect(() => {
     const hostname = window.location.hostname || 'localhost';
-    const channelName = LINKS.twitch.split('/').filter(Boolean).pop() || 'althea_chan';
+    const channelName = LINKS.twitch.split('/').filter(Boolean).pop() || 'taste_de_rambo';
     const params = new URLSearchParams({
       channel: channelName,
       parent: hostname,
