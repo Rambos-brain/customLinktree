@@ -97,13 +97,13 @@ export default function App() {
 
         <div className="right-column">
           <Panel
-            title="DISCORD"
+            title="DISCORD(no server yet)"
             link={LINKS.discord}
             img="/src/assets/discord.png"
             fallback={fallback}
           />
           <Panel
-            title="PLAYSTATION"
+            title="CHANGE THIS"
             link={LINKS.playstation}
             img="/src/assets/playstation.png"
             fallback={fallback}
