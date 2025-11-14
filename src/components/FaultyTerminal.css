@@ -1,0 +1,26 @@
+/* FaultyTerminal.css - keeps canvas behind UI and non-interactive */
+
+.faulty-terminal-container {
+  width: 100%;
+  height: 100%;
+  position: absolute; /* App.jsx puts this div as inset:0, so absolute is correct */
+  top: 0;
+  left: 0;
+  overflow: hidden;
+  pointer-events: auto; /* ensure clicks pass through */
+  z-index: 0;
+  background: transparent;
+}
+
+/* the WebGL canvas appended by the component */
+.faulty-terminal-container canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover;
+  pointer-events: none; /* don't block clicks */
+  z-index: 0;
+  display: block;
+}
