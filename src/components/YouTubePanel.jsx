@@ -82,7 +82,8 @@ export default function YouTubePanel() {
         </a>
       )}
 
-      <div className="panel-title absolute left-2 top-2">YOUTUBE VIDEO</div>
+      <div className="panel-title absolute left-2 top-2"></div>
+                                                          Here to add card title
     </div>
   );
 }

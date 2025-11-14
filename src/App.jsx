@@ -59,10 +59,10 @@ export default function App() {
             title="Twitch Stream"
             width="100%"
             height="100%"
-            frameBorder="0"
             allowFullScreen
           ></iframe>
-          <div className="panel-title absolute left-2 top-2">TWITCH STREAM</div>
+          <div className="panel-title absolute left-2 top-2"></div>
+                                                             Here to add card title if wanted
         </div>
 
         <div className="right-column">
@@ -90,7 +90,8 @@ export default function App() {
               allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
               loading="lazy"
             ></iframe>
-            <div className="panel-title absolute left-2 top-2">RAMBOS SPOTIFY</div>
+            <div className="panel-title absolute left-2 top-2"></div>
+                                                                Here to add card title
           </div>
         </div>
 
