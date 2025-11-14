@@ -1,6 +1,6 @@
 import React from "react";
 
-export default function Panel({ title, link, img, fallback }) {
+export default function Panel({ title, link, img, fallback, scale = 1 }) {
   const handleClick = (e) => {
     if (!link) return;
 
@@ -12,13 +12,12 @@ export default function Panel({ title, link, img, fallback }) {
       return; // stop normal opening
     }
 
-    // fallback (shouldn't happen)
     window.open(link, "_blank", "noopener,noreferrer");
   };
 
   return (
     <div
-      className="panel panel-hover right-tile relative cursor-pointer"
+      className="panel panel-hover right-tile relative cursor-pointer overflow-hidden"
       onClick={handleClick}
       title={title}
     >
@@ -26,7 +25,10 @@ export default function Panel({ title, link, img, fallback }) {
         src={img || fallback}
         alt={title}
         onError={(e) => (e.target.src = fallback)}
-        className="absolute inset-0 w-full h-full object-cover"
+        className="absolute inset-0 w-full h-full object-contain transition-transform duration-300"
+        style={{
+          transform: `scale(${scale})`,
+        }}
       />
 
       <div className="panel-title absolute left-0 bottom-0 w-full text-white">

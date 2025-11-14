@@ -86,6 +86,7 @@ export default function App() {
             link={LINKS.github}
             img={githubImg}    // FIXED
             fallback={fallback}
+            scale={0.9}
           />
         </div>
 
@@ -113,6 +114,7 @@ export default function App() {
             link={LINKS.discord}
             img={discordImg}  // FIXED
             fallback={fallback}
+            scale={1.3}
           />
           <Panel
             title="CHANGE THIS"
