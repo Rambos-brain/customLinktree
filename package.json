@@ -1,5 +1,5 @@
 {
-  "name": "customlinktree2",
+  "name": "customlinktree",
   "version": "0.0.0",
   "private": true,
   "scripts": {
@@ -14,6 +14,7 @@
     "react-dom": "^18.2.0"
   },
   "devDependencies": {
+    "@rollup/wasm-node": "^4.53.2",
     "autoprefixer": "^10.4.14",
     "postcss": "^8.4.24",
     "tailwindcss": "^3.4.13",
