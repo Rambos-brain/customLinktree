@@ -6,7 +6,15 @@ import FaultyTerminal from "./components/FaultyTerminal";
 import VoidTransition from "./components/VoidTransition";
 import FuzzyText from "./components/FuzzyText"; // important
 import { LINKS } from "./config";
+
 import fallback from "./assets/fallback.png";
+
+// ⭐ FIXED: Import actual images so Vite bundles them in production
+import twitterImg from "./assets/twitter.png";
+import githubImg from "./assets/github.png";
+import discordImg from "./assets/discord.png";
+import playstationImg from "./assets/playstation.png";
+
 import "./components/FaultyTerminal.css";
 
 export default function App() {
@@ -27,7 +35,6 @@ export default function App() {
 
   return (
     <div className="faulty-terminal-bg min-h-screen w-full relative overflow-hidden">
-
       <VoidTransition ref={voidRef} />
 
       <FaultyTerminal
@@ -61,25 +68,28 @@ export default function App() {
             height="100%"
             allowFullScreen
           ></iframe>
-          <div className="panel-title absolute left-2 top-2"></div>
-                                                             Here to add card title if wanted
+          <div className="panel-title absolute left-2 top-2">
+            {/* optional title */}
+          </div>
         </div>
 
+        {/* RIGHT COLUMN (TOP) */}
         <div className="right-column">
           <Panel
             title="TWITTER"
             link={LINKS.twitter}
-            img="/src/assets/twitter.png"
+            img={twitterImg}   // FIXED
             fallback={fallback}
           />
           <Panel
             title="GITHUB"
             link={LINKS.github}
-            img="/src/assets/github.png"
+            img={githubImg}    // FIXED
             fallback={fallback}
           />
         </div>
 
+        {/* YOUTUBE + SPOTIFY */}
         <div className="flex gap-4 items-stretch">
           <YouTubePanel />
 
@@ -90,22 +100,24 @@ export default function App() {
               allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
               loading="lazy"
             ></iframe>
-            <div className="panel-title absolute left-2 top-2"></div>
-                                                                Here to add card title
+            <div className="panel-title absolute left-2 top-2">
+              {/* optional title */}
+            </div>
           </div>
         </div>
 
+        {/* RIGHT COLUMN (BOTTOM) */}
         <div className="right-column">
           <Panel
-            title="DISCORD(no server yet)"
+            title="DISCORD (no server yet)"
             link={LINKS.discord}
-            img="/src/assets/discord.png"
+            img={discordImg}  // FIXED
             fallback={fallback}
           />
           <Panel
             title="CHANGE THIS"
             link={LINKS.playstation}
-            img="/src/assets/playstation.png"
+            img={playstationImg} // FIXED
             fallback={fallback}
           />
         </div>
